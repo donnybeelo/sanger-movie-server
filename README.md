@@ -1,29 +1,48 @@
-Movie Server
-============
+# Movie Server
 
 This server serves movie lists via a REST API.
 
-Endpoints
-=========
+## Build Instructions
 
-```
-The following endpoints are available:
-
-POST /api/auth
-	This endpoint allows users to authenticate themselves with the server. Accepts a JSON body with the following format:
-		{"username": "USERNAME", "password": "PASSWORD"}
-
-	On a success, the endpoint will return a JSON packet with the following format:
-		{"bearer": "TOKEN", "timeout": TOKEN_LIFETIME}
-
-GET /api/movies/$YEAR/$PAGE	
-	This endpoint requires the bearer token passed in the Authorization header. Will return a JSON list of upto 10 movies.
+```bash
+$ singularity build movie-server.sif singularity.def
 ```
 
-Usage
-=====
+## Run client:
 
+```bash
+singularity run [image-name] [options]
 ```
-  -port uint
-    	port to listen on (default 8080)
+
+### Options:
+
+- `--server SERVER` Specify the server URL
+- `--port PORT` Specify the server port (default: 8080)
+- `--year YEAR` Specify the year to fetch movies for
+- `--username USERNAME` Specify the username for authentication
+- `--password PASSWORD` Specify the password for authentication
+- `--verbose` Enable verbose output
+
+### Example:
+
+```bash
+singularity run movie-server.sif --year 1900 --username user --password pass --verbose
+```
+
+## Run server
+
+```bash
+singularity instance start [image-name] [name] [options]
+singularity instance stop [name]
+```
+
+### Options:
+
+- `-port PORT` Specify the port for the server (default: 8080)
+
+### Example:
+
+```bash
+singularity instance start movie-server.sif my_server --port 8081
+singularity instance stop my_server
 ```
