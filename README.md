@@ -21,12 +21,12 @@ singularity run [image-name] [options]
 - `--year YEAR` Specify the year to fetch movies for
 - `--username USERNAME` Specify the username for authentication
 - `--password PASSWORD` Specify the password for authentication
-- `--verbose` Enable verbose output (optional)
+- `--verbose` Enable verbose output (optional, dramatically decreases speed)
 
 ### Example:
 
 ```bash
-singularity run movie-server.sif --year 1900 --username user --password pass --verbose
+singularity run movie-server.sif --server localhost --year 1900 --username user --password pass --verbose
 ```
 
 ## Run server
