@@ -21,7 +21,7 @@ singularity run [image-name] [options]
 - `--year YEAR` Specify the year to fetch movies for
 - `--username USERNAME` Specify the username for authentication
 - `--password PASSWORD` Specify the password for authentication
-- `--verbose` Enable verbose output
+- `--verbose` Enable verbose output (optional)
 
 ### Example:
 

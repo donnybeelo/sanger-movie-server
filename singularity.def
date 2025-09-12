@@ -19,29 +19,25 @@ From: python:3.13-slim
 	movie-server $@
 
 %help
-	@echo "This is a Singularity container for the Movie Server/Client for the Sanger HCI take-home test"
-	@echo ""
-	@echo "Usage:"
-	@echo "  singularity run [image-name] [options]"
-	@echo ""
-	@echo "Options:"
-	@echo "  --server SERVER      Specify the server URL"
-	@echo "  --port PORT          Specify the server port (default: 8080)"
-	@echo "  --year YEAR          Specify the year to fetch movies for"
-	@echo "  --username USERNAME  Specify the username for authentication"
-	@echo "  --password PASSWORD  Specify the password for authentication"
-	@echo "  --verbose            Enable verbose output"
-	@echo ""
-	@echo "Example:"
-	@echo "  singularity run movie-server.sif --year 1900 --username user --password pass --verbose"
-	@echo ""
-	@echo "To start server:"
-	@echo "  singularity instance start movie-server.sif [name] [options]"
-	@echo "To stop server:"
-	@echo "  singularity instance stop [name]"
-	@echo ""
-	@echo "Options:"
-	@echo "  -port PORT          Specify the port for the server (default: 8080)"
-	@echo ""
-	@echo "Example:"
-	@echo "  singularity instance start movie-server.sif my_server -port 8081"
+	This is a Singularity container for the Movie Server/Client for the Sanger HCI take-home test
+
+	To run client:
+	  singularity run [image-name] [options]
+	Options:
+	  --server SERVER      Specify the server URL
+	  --port PORT          Specify the server port (default: 8080)
+	  --year YEAR          Specify the year to fetch movies for
+	  --username USERNAME  Specify the username for authentication
+	  --password PASSWORD  Specify the password for authentication
+	  --verbose            Enable verbose output (optional)
+	Example:
+	  singularity run movie-server.sif --year 1900 --username user --password pass --verbose
+
+	To start server:
+	  singularity instance start movie-server.sif [name] [options]
+	To stop server:
+	  singularity instance stop [name]
+	Options:
+	  -port PORT          Specify the port for the server (default: 8080)
+	Example:
+	  singularity instance start movie-server.sif my_server -port 8081
