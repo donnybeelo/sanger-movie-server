@@ -13,29 +13,24 @@ def main():
 
 	print_verbose(f"Filtering movies by year(s): {', '.join(map(str, args.year))}")
 	for year in args.year:
-		movies = fetch_movies_by_year(year, bearer)
-		suffix = "s" if movies != 1 else ""
-		print(f"Year {year}: {movies} movie{suffix}")
+		numberOfMovies = fetch_movies_by_year(year, bearer)
+		suffix = "s" if numberOfMovies != 1 else ""
+		print(f"Year {year}: {numberOfMovies} movie{suffix}")
 
 
 # Prints message only if in verbose mode
 def print_verbose(message):
-	if verbose:
-		print(message)
+	print(message) if verbose else None
 
-def check_authenticated(bearer):
-	response = requests.get(
-		f"http://{args.server}:{args.port}/api/movies/2025/1",
-		headers={'Authorization': f"Bearer {bearer}"}
-	)
-	return response.status_code != 401
-
-
+# Authenticates with the server using provided username and password, returns bearer token if successful
 def authenticate():
 	print_verbose(f"Connecting to server at {args.server}:{args.port} with username {args.username}")
 
 	# Sends request to server to authenticate with username and password
-	response = requests.post(f"http://{args.server}:{args.port}/api/auth", json={'username': args.username, 'password': args.password})
+	response = requests.post(
+		f"http://{args.server}:{args.port}/api/auth",
+		json={'username': args.username, 'password': args.password}
+	)
 
 	bearer = response.json().get('bearer')
 
@@ -46,59 +41,62 @@ def authenticate():
 		print_verbose(f"Login failed! Status Code: {response.status_code}, Response: {response.text}")
 		return None
 
+# Fetches movies in a specific page for a given year, returns a tuple of the number of movies found and the status code
+def fetch_movies_in_page(year, page, pageCount, bearer):
+	# If we've already found an empty page, skip further requests
+	if len(pageCount) > 0:
+		return 0, 401
+	
+	response = requests.get(
+		f"http://{args.server}:{args.port}/api/movies/{year}/{page}",
+		headers={'Authorization': f"Bearer {bearer}"}
+	)
 
-def fetch_movies_by_year(year, bearer):
-	errorCode = 0
+	statusCode = response.status_code
+	print_verbose(f"Fetching page {page} for year {year}: Status Code {statusCode}")
 
-	def fetch_movies_in_page(year, page, pageCount, bearer):
-		nonlocal errorCode
 
-		if len(pageCount) > 0:
-			return 0
-		response = requests.get(
-			f"http://{args.server}:{args.port}/api/movies/{year}/{page}",
-			headers={'Authorization': f"Bearer {bearer}"}
-		)
-		print_verbose(f"Fetching page {page} for year {year}: Status Code {response.status_code}")
-		if response.status_code > errorCode:
-			errorCode = response.status_code
-		if response.status_code == 200:
-			# print_verbose(response.text)
-			return len(eval(response.text))  # Assuming the server returns a list of movies
+	if statusCode == 200:
+		return len(eval(response.text)), statusCode
 
-		pageCount.append(page)
-		return 0
+	pageCount.append(page)
+	return 0, statusCode
 
-	def fetch_movies_starting_from_page(year, page, bearer):
-		nonlocal errorCode
+# Fetches movies from each page starting from a given page for a specific year until an empty page is found
+# or an error code is returned. If a 401 Unauthorized status code is encountered, it re-authenticates and calls itself
+def fetch_movies_starting_from_page(year, page, bearer):
+	pageCount = []
+
+	with ThreadPoolExecutor(max_workers=100) as executor:
+		futures = {}
+		while len(pageCount) == 0:
+			# Submit a request for the current page
+			future = executor.submit(fetch_movies_in_page, year, page, pageCount, bearer)
+			futures[page] = future
+			page += 1
+
+		# Wait for all futures to complete
+		output = {page:length for page, length in futures.items() if length.result()[1] == 200}
+
+	# Check if the latest non-ok request returned a 401 Unauthorized status code
+	authed = futures[min(pageCount)].result()[1] != 401
+	if not authed:
+		print_verbose("Session expired, re-authenticating...")
+		bearer = authenticate()
+		page = min(pageCount) - 1 if len(pageCount) > 0 else 1
+		if page < 1: page = 1
+		print_verbose(f"Starting fetch from page {page} for year {year}")
 		pageCount = []
+		return output | fetch_movies_starting_from_page(year, page, bearer)
+	return output
 
-		with ThreadPoolExecutor() as executor:
-			futures = {}
-			while len(pageCount) == 0:
-				# Submit a request for the current page
-				future = executor.submit(fetch_movies_in_page, year, page, pageCount, bearer)
-				futures[page] = future
-				page += 1
-
-			# Wait for all futures to complete
-			output = {year:length for year, length in futures.items() if length.result() > 0}
-
-		authed = errorCode != 401
-		if not authed:
-			print_verbose("Session expired, re-authenticating...")
-			bearer = authenticate()
-			page = min(pageCount) - 1 if len(pageCount) > 0 else 1
-			print_verbose(f"Starting fetch from page {page} for year {year}")
-			pageCount = []
-			return output | fetch_movies_starting_from_page(year, page, bearer)
-		return output
-			
+# Calls recursive function to fetch all movies for a given year, returns the total number of movies found
+def fetch_movies_by_year(year, bearer):		
 	moviePages = fetch_movies_starting_from_page(year, 1, bearer)
+	return sum(future.result()[0] for future in moviePages.values())
 
-	return sum(future.result() for future in moviePages.values())
-
-
+# Establishes parameters, parses the arguments, and returns them as attributes within the `args` object
+# Also sets the global `verbose` variable depending on if -v is present
 def cli():
 	parser = argparse.ArgumentParser(description="Movie Server Client CLI")
 	
