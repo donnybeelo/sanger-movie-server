@@ -1,0 +1,19 @@
+Bootstrap: docker
+From: python:3.13-slim
+
+%post
+	apt-get update && apt-get install -y --no-install-recommends build-essential git curl golang
+
+	git clone https://github.com/donnybeelo/sanger-movie-server
+	cd sanger-movie-server
+
+	pip install --no-cache-dir -r requirements.txt
+	
+	make build
+	mv movie-server /usr/local/bin/
+
+%runscript
+	python3 client.py $@
+
+%startscript
+	movie-server $@
