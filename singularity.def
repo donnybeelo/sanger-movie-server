@@ -44,4 +44,4 @@ From: python:3.13-slim
 	@echo "  -port PORT          Specify the port for the server (default: 8080)"
 	@echo ""
 	@echo "Example:"
-	@echo "  singularity instance start movie-server.sif my_server --port 8081"
+	@echo "  singularity instance start movie-server.sif my_server -port 8081"
