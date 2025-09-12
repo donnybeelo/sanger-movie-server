@@ -86,7 +86,7 @@ def fetch_movies_starting_from_page(args, year, page, bearer):
 	authed = futures[min(pageCount)].result()[1] != 401
 	if not authed:
 		print_verbose("Session expired, re-authenticating...")
-		bearer = authenticate()
+		bearer = authenticate(args)
 		page = min(pageCount) - 1 if len(pageCount) > 0 else 1
 		if page < 1: page = 1
 		print_verbose(f"Starting fetch from page {page} for year {year}")
