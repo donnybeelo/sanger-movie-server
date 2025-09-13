@@ -1,19 +1,19 @@
 Bootstrap: docker
-From: python:3.13-slim
+From: alpine:3.22.1
 
 %post
-	apt-get update && apt-get install -y --no-install-recommends make git golang
+	apk add --no-cache make git go
 
-	git clone https://github.com/donnybeelo/sanger-movie-server
+	git clone -b go-gemini-conversion https://github.com/donnybeelo/sanger-movie-server
 	cd sanger-movie-server
 
-	pip install --no-cache-dir -r requirements.txt
+	go build -o /usr/local/bin/client client/client.go
 
 	make build
 	mv movie-server /usr/local/bin/
 
 %runscript
-	python3 client.py $@
+	client $@
 
 %startscript
 	movie-server $@
