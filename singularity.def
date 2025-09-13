@@ -2,7 +2,7 @@ Bootstrap: docker
 From: python:3.13-slim
 
 %post
-	apt-get update && apt-get install -y --no-install-recommends build-essential git curl golang
+	apt-get update && apt-get install -y --no-install-recommends make git golang
 
 	git clone https://github.com/donnybeelo/sanger-movie-server
 	cd sanger-movie-server
