@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 )
 
 var (
@@ -122,93 +121,80 @@ func fetchMoviesInPage(ctx context.Context, server string, port, year, page int,
 	return len(movies), resp.StatusCode, nil
 }
 
-// fetchMoviesByYear orchestrates fetching all movies for a given year, handling concurrency and re-authentication.
+// fetchMoviesByYear orchestrates fetching all movies for a given year.
+// It first determines the number of movies on page 1, and if that is zero, returns zero.
+// It then finds the last page with movies. With the number of pages, it can calculate the total number of movies.
 func fetchMoviesByYear(server string, port, year int, bearer, user, pass string) (int, error) {
-	var totalMovieCount int64
-	currentPage := 1
-	currentBearer := bearer
-
-	// Outer loop to handle re-authentication attempts.
-	for {
-		var wg sync.WaitGroup
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		pageChan := make(chan int, 100) // Buffer for pages to fetch
-
-		var reauthRequired int32
-
-		// Worker goroutines
-		for i := 0; i < 100; i++ {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				for page := range pageChan {
-					if atomic.LoadInt32(&reauthRequired) > 0 {
-						return
-					}
-					count, status, err := fetchMoviesInPage(ctx, server, port, year, page, currentBearer)
-					if err != nil {
-						log.Printf("Error fetching page %d for year %d: %v", page, year, err)
-						cancel()
-						return
-					}
-
-					if status == http.StatusUnauthorized {
-						atomic.StoreInt32(&reauthRequired, 1)
-						cancel() // Stop all workers
-						return
-					}
-
-					if status != http.StatusOK || count == 0 {
-						cancel() // Found the end or an error, stop all workers
-						return
-					}
-					atomic.AddInt64(&totalMovieCount, int64(count))
-				}
-			}()
+	// Get movies on page 1 to find out movies per page.
+	moviesOnPage1, status, err := fetchMoviesInPage(context.Background(), server, port, year, 1, bearer)
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch page 1 for year %d: %w", year, err)
+	}
+	if status == http.StatusUnauthorized {
+		printVerbose("Session expired, re-authenticating...")
+		bearer, err = authenticate(server, port, user, pass)
+		if err != nil {
+			return 0, fmt.Errorf("failed to re-authenticate: %w", err)
 		}
-
-		// Producer goroutine
-		producerDone := make(chan struct{})
-		go func() {
-			defer close(producerDone)
-			defer close(pageChan)
-			page := currentPage
-			for {
-				select {
-				case pageChan <- page:
-					page++
-				case <-ctx.Done():
-					return
-				}
-			}
-		}()
-
-		<-ctx.Done() // Wait until cancellation is triggered
-
-		// Ensure producer is done before waiting on workers
-		<-producerDone
-		wg.Wait()
-
-		if atomic.LoadInt32(&reauthRequired) > 0 {
-			printVerbose("Session expired, re-authenticating...")
-			newBearer, err := authenticate(server, port, user, pass)
-			if err != nil {
-				return 0, fmt.Errorf("failed to re-authenticate: %w", err)
-			}
-			currentBearer = newBearer
-			// The page that failed was not processed, so we can just continue.
-			// A more robust implementation might restart from the failed page.
-			continue
+		moviesOnPage1, status, err = fetchMoviesInPage(context.Background(), server, port, year, 1, bearer)
+		if err != nil {
+			return 0, fmt.Errorf("failed to fetch page 1 for year %d after re-auth: %w", year, err)
 		}
-
-		// If we are here, it means we finished successfully or with a non-auth error.
-		cancel()
-		break
 	}
 
-	return int(totalMovieCount), nil
+	if status != http.StatusOK {
+		return 0, fmt.Errorf("failed to fetch page 1 for year %d. Status: %d", year, status)
+	}
+
+	if moviesOnPage1 == 0 {
+		return 0, nil
+	}
+	moviesPerPage := moviesOnPage1
+
+	// Find the last page
+	lastPage := 1
+	// Exponential search for an upper bound
+	for {
+		count, status, err := fetchMoviesInPage(context.Background(), server, port, year, lastPage*2, bearer)
+		if err != nil {
+			return 0, fmt.Errorf("failed to fetch page %d for year %d: %w", lastPage*2, year, err)
+		}
+		if status != http.StatusOK || count == 0 {
+			break
+		}
+		lastPage *= 2
+	}
+
+	// Binary search for the last page
+	low, high := lastPage, lastPage*2
+	for low <= high {
+		mid := (low + high) / 2
+		if mid == 0 { // Should not happen with our logic
+			break
+		}
+		count, status, err := fetchMoviesInPage(context.Background(), server, port, year, mid, bearer)
+		if err != nil {
+			return 0, fmt.Errorf("failed to fetch page %d for year %d: %w", mid, year, err)
+		}
+		if status == http.StatusOK && count > 0 {
+			lastPage = mid
+			low = mid + 1
+		} else {
+			high = mid - 1
+		}
+	}
+
+	// Get the number of movies on the last page
+	moviesOnLastPage, status, err := fetchMoviesInPage(context.Background(), server, port, year, lastPage, bearer)
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch last page %d for year %d: %w", lastPage, year, err)
+	}
+	if status != http.StatusOK {
+		return 0, fmt.Errorf("failed to fetch last page %d for year %d. Status: %d", lastPage, year, status)
+	}
+
+	totalMovies := (lastPage-1)*moviesPerPage + moviesOnLastPage
+	return totalMovies, nil
 }
 
 func main() {
