@@ -4,19 +4,22 @@ from concurrent.futures import ThreadPoolExecutor
 
 verbose = False # Global variable to control verbose output
 
-def main():
-	args = cli()
+def main(args=None):
+	if args is None:
+		args = cli()
 
 	bearer = authenticate(args)
 	if not bearer:
 		raise PermissionError("Authentication failed. Username or password incorrect.")
 
 	print_verbose(f"Filtering movies by year(s): {', '.join(map(str, args.year))}")
+	output = {}
 	for year in args.year:
 		numberOfMovies = fetch_movies_by_year(args, year, bearer)
 		suffix = "s" if numberOfMovies != 1 else ""
+		output[year] = numberOfMovies
 		print(f"Year {year}: {numberOfMovies} movie{suffix}")
-
+	return output
 
 # Prints message only if in verbose mode
 def print_verbose(message):

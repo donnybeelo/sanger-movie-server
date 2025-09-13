@@ -1,81 +1,65 @@
 import unittest
-from unittest.mock import patch, MagicMock
 from client import main, authenticate, fetch_movies_by_year
 import argparse
+import requests
 
 class TestClient(unittest.TestCase):
 
-    @patch('client.authenticate')
-    @patch('client.fetch_movies_by_year')
-    @patch('client.cli')
-    def test_main(self, mock_cli, mock_fetch_movies_by_year, mock_authenticate):
-        # Mock CLI arguments
-        mock_cli.return_value = argparse.Namespace(
+    def setUp(self):
+        # Set up arguments for real server
+        self.args = argparse.Namespace(
             server='localhost',
-            port=8080,
-            username='testuser',
-            password='testpass',
-            year=[1894, 1905, 1930, 2020],
-            verbose=True
+            port=8080, 
+            username='username',  
+            password='password',
+            year=[1894, 1905, 1930, 2020, 2021, 2022, 2023, 2024],
+            verbose=False
         )
 
-        # Mock authentication
-        mock_authenticate.return_value = 'mock_bearer_token'
+    def test_server_connection(self):
+        # Test connection to server (assuming server is running on localhost:8080)
+        try:
+            response = requests.get(f"http://{self.args.server}:{self.args.port}/api/movies")
+            self.assertEqual(response.content, b'{"error": "year or page not found"}')
+        except Exception as e:
+            self.fail(f"Connection to server failed: {e}")
 
-        # Mock fetch_movies_by_year
-        mock_fetch_movies_by_year.side_effect = [1, 16, 1891, 14808]
+    def test_authenticate(self):
+        # Call authenticate and verify bearer token is in the correct format (hex:hex)
+        bearer = authenticate(self.args)
+        self.assertIsInstance(bearer, str)
+        self.assertRegex(bearer, r'^[a-fA-F0-9]+:[a-fA-F0-9]+$')
 
-        # Capture print statements
-        with patch('builtins.print') as mock_print:
-            main()
+    def test_fetch_movies_by_year(self):
+        # Call fetch_movies_by_year and verify output
+        bearer = authenticate(self.args)
+        total_movies = fetch_movies_by_year(self.args, 1894, bearer)
+        self.assertIsInstance(total_movies, int)
+        self.assertEqual(total_movies, 1)  # Known number of movies released in 1894
+        
+        bearer = authenticate(self.args)
+        total_movies = fetch_movies_by_year(self.args, 1905, bearer)
+        self.assertIsInstance(total_movies, int)
+        self.assertEqual(total_movies, 16)  # Known number of movies released in 1905
 
-        # Verify prints
-        mock_print.assert_any_call("Year 1894: 1 movie")
-        mock_print.assert_any_call("Year 1905: 16 movies")
-        mock_print.assert_any_call("Year 1930: 1891 movies")
-        mock_print.assert_any_call("Year 2020: 14808 movies")
+        bearer = authenticate(self.args)
+        total_movies = fetch_movies_by_year(self.args, 1930, bearer)
+        self.assertIsInstance(total_movies, int)
+        self.assertEqual(total_movies, 1891)  # Known number of movies released in 1930
 
-    @patch('client.requests.post')
-    def test_authenticate(self, mock_post):
-        # Mock response
-        mock_response = MagicMock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {'bearer': 'mock_bearer_token'}
-        mock_post.return_value = mock_response
+        bearer = authenticate(self.args)
+        total_movies = fetch_movies_by_year(self.args, 2020, bearer)
+        self.assertIsInstance(total_movies, int)
+        self.assertEqual(total_movies, 14808)  # Known number of movies released in 2020
+    
+    def test_main(self):
+        # Test the main function with the provided args against expected output
+        expected = {1894: 1, 1905: 16, 1930: 1891, 2020: 14808, 2021: 17282, 2022: 18513, 2023: 16956, 2024: 14957}
+        output = main(self.args)
+        self.assertIsInstance(output, dict)
+        for year in self.args.year:
+            self.assertEqual(output[year], expected[year])
 
-        # Set up arguments
-        global args
-        args = argparse.Namespace(
-            server='localhost',
-            port=8080,
-            username='testuser',
-            password='testpass'
-        )
-
-        # Call authenticate
-        bearer = authenticate(args)
-
-        # Verify
-        self.assertEqual(bearer, 'mock_bearer_token')
-        mock_post.assert_called_once_with(
-            'http://localhost:8080/api/auth',
-            json={'username': 'testuser', 'password': 'testpass'}
-        )
-
-    @patch('client.fetch_movies_starting_from_page')
-    def test_fetch_movies_by_year(self, mock_fetch_movies_starting_from_page):
-        # Mock response
-        mock_fetch_movies_starting_from_page.return_value = {
-            1: MagicMock(result=MagicMock(return_value=(1, 200))),
-            2: MagicMock(result=MagicMock(return_value=(0, 200)))
-        }
-
-        # Call fetch_movies_by_year
-        total_movies = fetch_movies_by_year(args, 1894, 'mock_bearer_token')
-
-        # Verify
-        self.assertEqual(total_movies, 1)
-        mock_fetch_movies_starting_from_page.assert_called_once_with(args, 1894, 1, 'mock_bearer_token')
 
 if __name__ == '__main__':
     unittest.main()
