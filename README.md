@@ -26,7 +26,7 @@ singularity run [image-name] [options]
 ### Example:
 
 ```bash
-singularity run movie-server.sif --server localhost --year 1900 --username user --password pass --verbose
+singularity run movie-server.sif --server localhost --year 1900 --username username --password password --verbose
 ```
 
 ## Run server
