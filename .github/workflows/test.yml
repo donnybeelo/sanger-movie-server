@@ -19,18 +19,16 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.13'
-    - name: Change directory to client/
-      run: cd client
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        cd client && pip install -r requirements.txt
     - name: Run tests
       run: |
-        python -m unittest discover -s tests -p "test_*.py"
+        cd client && python -m unittest discover -s tests -p "test_*.py"
         echo "All tests passed!"
     - name: Lint code
       run: |
         pip install flake8
-        flake8 .
+        cd client && flake8 .
         echo "Linting passed!"
