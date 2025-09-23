@@ -1,19 +1,34 @@
 Bootstrap: docker
-From: python:3.13-slim
+From: golang:1.24.7-alpine3.22
+Stage: server
 
 %post
-	apt-get update && apt-get install -y --no-install-recommends make git golang
+	apk add --no-cache git make
 
-	git clone https://github.com/donnybeelo/sanger-movie-server
-	cd sanger-movie-server
+	git clone -b v0.99 https://github.com/wtsi-hgi/movie-server server
+	cd server
+
+	sed 's/@go/\t@go/g' Makefile -i
+	make build
+
+Bootstrap: docker
+From: python:3.13-slim
+Stage: final
+
+%post
+	apt-get update && apt-get install -y --no-install-recommends git
+
+	git clone https://github.com/donnybeelo/sanger-movie-server client
+	cd client/client
 
 	pip install --no-cache-dir -r requirements.txt
 
-	make build
-	mv movie-server /usr/local/bin/
-
+%files from server
+	server/movie-server /usr/local/bin/movie-server
+%files
+	client/client/client.py /usr/local/bin/movie-client
 %runscript
-	python3 client.py $@
+	movie-client $@
 
 %startscript
 	movie-server $@
