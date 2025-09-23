@@ -18,7 +18,7 @@ Stage: final
 %post
 	apt-get update && apt-get install -y --no-install-recommends git
 
-	git clone https://github.com/donnybeelo/sanger-movie-server client
+	git clone -b fix/interview-pair-programming https://github.com/donnybeelo/sanger-movie-server client
 	cd client/client
 
 	pip install --no-cache-dir -r requirements.txt
