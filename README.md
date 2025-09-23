@@ -1,6 +1,8 @@
-# Movie Server
+# Movie Client
 
-This server serves movie lists via a REST API.
+This client interacts with a movie server via a REST API.
+
+Server code: [https://github.com/wtsi-hgi/movie-server](https://github.com/wtsi-hgi/movie-server).
 
 ## Build Instructions
 
